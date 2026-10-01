@@ -151,12 +151,14 @@ header{display:flex;flex-direction:column;gap:10px;padding:10px 0 6px}
   function sfxOk(){tone(300,.12,0,120,.25);tone(523,.12,.12);tone(659,.12,.22);tone(784,.2,.32)}
   function sfxNo(){tone(220,.2,0,150);tone(160,.25,.15,110)}
   function sfxPick(){tone(440,.06)}
-  function say(t){if(!S.speak||!('speechSynthesis' in window))return;try{speechSynthesis.cancel();var u=new SpeechSynthesisUtterance(t);u.rate=.85;u.pitch=1.2;speechSynthesis.speak(u)}catch(e){}}
+  var NM={A:'ay',B:'bee',C:'see',D:'dee',E:'ee',F:'eff',G:'jee',H:'aitch',I:'eye',J:'jay',K:'kay',L:'el',M:'em',N:'en',O:'oh',P:'pee',Q:'cue',R:'are',S:'ess',T:'tee',U:'you',V:'vee',W:'double you',X:'ex',Y:'why',Z:'zee'};
+  function nm(c){return NM[c]||c}
+  function say(t){if(!S.speak||!('speechSynthesis' in window))return;try{speechSynthesis.cancel();var u=new SpeechSynthesisUtterance(t);u.lang='en-US';u.rate=.85;u.pitch=1.2;speechSynthesis.speak(u)}catch(e){}}
 
   var target='A', last='', busy=false;
   var mon=$('monster'), tray=$('tray');
 
-  function ask(){say('Can I have the letter '+target+'?')}
+  function ask(){say('Can I have the letter '+nm(target)+'?')}
   function round(){
     busy=false;
     var p=pool(),t;
@@ -192,7 +194,7 @@ header{display:flex;flex-direction:column;gap:10px;padding:10px 0 6px}
     tile.addEventListener('pointerdown',function(e){
       if(busy||id!==null)return;
       id=e.pointerId;sx=e.clientX;sy=e.clientY;moved=false;
-      tile.setPointerCapture(id);tile.classList.add('drag');sfxPick();
+      tile.setPointerCapture(id);tile.classList.add('drag');sfxPick();say(nm(tile.dataset.l));
     });
     tile.addEventListener('pointermove',function(e){
       if(e.pointerId!==id)return;
@@ -233,13 +235,13 @@ header{display:flex;flex-direction:column;gap:10px;padding:10px 0 6px}
       sfxOk();sparks();
       P.gauge=Math.min(100,P.gauge+(+S.gain));save();hud();
       if(P.gauge>=100){setTimeout(function(){endGame(true)},900)}
-      else{say('Yum! '+target+'!');setTimeout(round,1400)}
+      else{say('Yum! '+nm(target)+'!');setTimeout(round,1400)}
     }else{
       tile.style.transform='';tile.classList.add('wrong');
       anim('no',500);sfxNo();
       P.gauge=Math.max(0,P.gauge-1);save();hud();
       if(P.gauge<=0){busy=true;setTimeout(function(){endGame(false)},700)}
-      else say('Hmm, that is '+tile.dataset.l+'. I want '+target+'.');
+      else say('Hmm, that is '+nm(tile.dataset.l)+'. I want '+nm(target)+'.');
     }
   }
 
@@ -278,7 +280,7 @@ header{display:flex;flex-direction:column;gap:10px;padding:10px 0 6px}
   document.addEventListener('keydown',function(e){if(e.key==='Escape')closeS()});
   $('reset').addEventListener('click',function(){if(confirm('Restart the game from 1?')){closeS();restart()}});
   $('replay').addEventListener('click',function(){var c=ctx();if(c&&c.state==='suspended')c.resume();ask()});
-  document.addEventListener('pointerdown',function(){var c=ctx();if(c&&c.state==='suspended')c.resume()},{once:true});
+  document.addEventListener('pointerdown',function(e){var c=ctx();if(c&&c.state==='suspended')c.resume();if(!e.target.closest('.tile,#replay,#overlay,#end,#gear'))ask()},{once:true});
 
   apply();hud();round();
 })();
