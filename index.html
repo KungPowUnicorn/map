@@ -56,6 +56,11 @@ body.playing main>:not(#viewer){display:none}
 body.playing header{padding:8px clamp(12px,3vw,24px) 0}
 body.playing h1{font-size:1.2rem}
 body.playing .tools,body.playing #tagline{display:none}
+#revealTab{display:none;position:fixed;top:env(safe-area-inset-top,0px);left:50%;transform:translateX(-50%);z-index:20;padding:0 18px;line-height:1.5;border-top:0;border-radius:0 0 14px 14px;opacity:.85}
+#revealTab:hover{opacity:1}
+body.hdr-off #revealTab{display:block}
+body.hdr-off header,body.hdr-off.playing header{display:block;padding:0}
+body.hdr-off header>:not(#revealTab):not(dialog):not(#picker){display:none}
 dialog{border:3px solid var(--line);border-radius:24px;background:var(--surface);color:var(--ink);max-width:440px;width:calc(100% - 32px);padding:24px;font-family:var(--font)}
 dialog::backdrop{background:rgba(20,14,30,.55)}
 dialog h2{margin:0 0 10px;color:var(--accent)}
@@ -76,9 +81,12 @@ body[data-density=roomy]{--min:340px;--gap:28px}
       <div><div class="row" style="margin-bottom:8px">Color theme</div><div class="swatches" id="swatches"></div></div>
       <label class="row">Card size<select id="density"><option value="compact">Compact</option><option value="cozy">Cozy</option><option value="roomy">Roomy</option></select></label>
       <label class="row">Play inside dashboard<input type="checkbox" id="embed"></label>
+      <label class="row">Auto-hide header while playing<input type="checkbox" id="autohide"></label>
       <label class="row">Sound<input type="checkbox" id="sound"></label>
+      <div class="row">Games found<span id="count">0</span></div>
     </div>
     <button class="btn" id="aboutBtn">About</button>
+    <button class="btn icon" id="hideBtn" title="Hide header (H)" aria-label="Hide header">▲</button>
   </div>
   <div class="titles">
     <h1>Mika's Adorable Playhouse</h1>
@@ -91,6 +99,8 @@ body[data-density=roomy]{--min:340px;--gap:28px}
     <button class="btn icon" id="random" title="Surprise me">🎲</button>
     <button class="btn icon" id="refresh" title="Rescan games">↻</button>
   </div>
+  <button class="btn" id="revealTab" aria-label="Show header" title="Show header (H)">▼</button>
+  <input type="file" id="picker" webkitdirectory multiple hidden>
   <dialog id="aboutDialog" aria-labelledby="aboutTitle">
     <h2 id="aboutTitle">About</h2>
     <p>Welcome to Mika's Adorable Playhouse! This is a cozy little collection of educational games for toddlers and kids, where learning looks suspiciously like playing.</p>
@@ -119,7 +129,7 @@ body[data-density=roomy]{--min:340px;--gap:28px}
 </main>
 
 <script>
-const REPO='KungPowUnicorn/map',CACHE_KEY='mph_cache_v3',TTL=10*60*1000;
+const REPO='KungPowUnicorn/map',CACHE_KEY='mph_cache_v4',TTL=10*60*1000;
 const THEMES={
  sunny:{n:'Sunny',bg:'#FFF6E9',surface:'#FFFFFF',ink:'#3B2A4A',muted:'#7A6A88',accent:'#FF6FA5',accent2:'#4FC3C7',line:'#F0DFC8',shadow:'rgba(59,42,74,.12)'},
  ocean:{n:'Ocean',bg:'#E6F6FB',surface:'#FFFFFF',ink:'#12384A',muted:'#4F7C8F',accent:'#0A8FC7',accent2:'#F2A33A',line:'#BFE3F0',shadow:'rgba(18,56,74,.14)'},
@@ -131,6 +141,7 @@ const THEMES={
 };
 const KEYWORDS=[[/abc|letter|alphabet|word|spell/i,'🔤'],[/num|count|math|1234/i,'🔢'],[/color|colour|paint|draw/i,'🎨'],[/shape/i,'🔷'],[/farm|cow|barn/i,'🐄'],[/animal|zoo|pet|dog|cat/i,'🐶'],[/music|piano|song|sound/i,'🎵'],[/match|memory|pair/i,'🧠'],[/puzzle/i,'🧩'],[/space|rocket|planet/i,'🚀'],[/car|truck|vehicle|train/i,'🚗'],[/ball|balloon|pop|bubble/i,'🎈'],[/fish|ocean|sea/i,'🐠'],[/dino/i,'🦖'],[/bug|insect|bee/i,'🐝'],[/food|fruit|veg/i,'🍎']];
 const EMOJI=['🦄','🧸','🌈','⭐','🐥','🎲','🪁','🍓','🐢','🎯','🛝','🪀'];
+const TAGLINE="Pick a game and let's play!";
 const $=id=>document.getElementById(id);
 const store={get(k,d){try{return localStorage.getItem(k)??d}catch{return d}},set(k,v){try{localStorage.setItem(k,v)}catch{}},del(k){try{localStorage.removeItem(k)}catch{}}};
 const S={metas:[],list:[],q:'',sort:store.get('sort','az'),favOnly:false,cur:null,truncated:false,favs:new Set()};
@@ -162,6 +173,7 @@ function applyTheme(id){
   document.querySelectorAll('.sw').forEach(b=>b.setAttribute('aria-pressed',b.dataset.id===id));
 }
 const toggleMenu=o=>{$('settingsMenu').hidden=!o;$('settingsBtn').setAttribute('aria-expanded',o)};
+function setHdr(off){toggleMenu(false);document.body.classList.toggle('hdr-off',off)}
 function initSettings(){
   for(const[id,t]of Object.entries(THEMES)){
     const b=document.createElement('button');b.className='sw';b.dataset.id=id;b.title=t.n;b.setAttribute('aria-label',t.n+' theme');
@@ -175,6 +187,8 @@ function initSettings(){
   $('sound').onchange=e=>{store.set('sound',e.target.checked?'on':'off');syncMute();blip(780)};
   $('embed').checked=store.get('embed','on')==='on';
   $('embed').onchange=e=>store.set('embed',e.target.checked?'on':'off');
+  $('autohide').checked=store.get('autohide','off')==='on';
+  $('autohide').onchange=e=>store.set('autohide',e.target.checked?'on':'off');
   $('settingsBtn').onclick=e=>{e.stopPropagation();toggleMenu($('settingsMenu').hidden)};
   document.addEventListener('pointerdown',e=>{if(!$('settingsMenu').contains(e.target)&&!$('settingsBtn').contains(e.target))toggleMenu(false)});
   window.addEventListener('blur',()=>{if(document.activeElement===$('frame'))toggleMenu(false)});
@@ -184,48 +198,116 @@ function initSettings(){
 }
 
 /* ---------- discovery ---------- */
-const isLocal=['localhost','127.0.0.1'].includes(location.hostname);
+const isLocal=/^(localhost|127\.|\[::1\]|0\.0\.0\.0|10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.|.+\.local$)/i.test(location.hostname);
+const encPath=p=>p.split('/').map(encodeURIComponent).join('/');
 const skipSeg=s=>s.startsWith('.')||s==='node_modules';
-const wanted=p=>/\.html$/i.test(p)&&p.toLowerCase()!=='index.html'&&!p.split('/').some(skipSeg);
+const isHtml=p=>/\.html?$/i.test(p);
+function skipReason(p){
+  if(p.toLowerCase()==='index.html')return 'root dashboard page';
+  if(p.split('/').some(skipSeg))return 'inside a hidden or node_modules folder';
+  return '';
+}
+const wanted=p=>isHtml(p)&&!skipReason(p);
 
 async function listLocal(dir='',depth=0){
-  const res=await fetch('./'+encodeURI(dir));
+  if(depth===0){
+    try{ /* preferred: serve.py exposes every .html file */
+      const r=await fetch('__games.json',{cache:'no-store'});
+      if(r.ok){const j=await r.json();if(Array.isArray(j)){
+        const out=[];
+        for(const p of j){if(!isHtml(p))continue;if(wanted(p))out.push(p);else S.skipped.push([p,skipReason(p)])}
+        return out;
+      }}
+    }catch{}
+  }
+  const base=new URL('./'+encPath(dir),location.href),root=new URL('./',location.href).pathname;
+  const res=await fetch(base,{cache:'no-store'});
   if(!res.ok)throw new Error('Directory listing failed ('+res.status+')');
   const doc=new DOMParser().parseFromString(await res.text(),'text/html');
+  if(depth===0&&doc.getElementById('grid'))
+    throw new Error("this server returns index.html instead of listing the folder, so local files can't be discovered. Start it with: python serve.py");
   const out=[],subs=[];
   for(const a of doc.querySelectorAll('a[href]')){
-    const raw=a.getAttribute('href').split(/[?#]/)[0];
-    if(!raw||/^(\/|\.\.|[a-z]+:)/i.test(raw))continue;
-    const name=decodeURIComponent(raw).replace(/^\.\//,'');
-    if(name.endsWith('/')){if(!skipSeg(name.slice(0,-1))&&depth<5)subs.push(dir+name)}
-    else if(/\.html$/i.test(name))out.push(dir+name);
+    let u;try{u=new URL(a.getAttribute('href'),base)}catch{continue}
+    if(u.origin!==location.origin||!u.pathname.startsWith(root))continue;
+    const rel=decodeURIComponent(u.pathname.slice(root.length));
+    if(!rel.startsWith(dir)||rel===dir)continue;
+    if(rel.endsWith('/')){if(!skipSeg(rel.slice(dir.length,-1))&&depth<5)subs.push(rel)}
+    else if(isHtml(rel)){if(wanted(rel)){if(!out.includes(rel))out.push(rel)}else S.skipped.push([rel,skipReason(rel)])}
   }
-  const nested=await Promise.all(subs.map(s=>listLocal(s,depth+1).catch(()=>[])));
-  return out.concat(...nested).filter(wanted);
+  if(dir){ /* servers show a folder's index.html instead of a listing */
+    const ip=dir+'index.html';
+    if(!out.includes(ip))try{const r=await fetch(new URL('./'+encPath(ip),location.href),{method:'HEAD'});if(r.ok)out.push(ip)}catch{}
+  }
+  const nested=await Promise.all(subs.map(d=>listLocal(d,depth+1).catch(()=>[])));
+  return out.concat(...nested);
 }
 async function listGitHub(){
   const res=await fetch(`https://api.github.com/repos/${REPO}/git/trees/main?recursive=1`);
   if(!res.ok)throw new Error('GitHub API returned '+res.status+(res.status===403?' (rate limit)':''));
   const data=await res.json();S.truncated=!!data.truncated;
-  return data.tree.filter(n=>n.type==='blob'&&wanted(n.path)).map(n=>n.path);
+  const all=data.tree.filter(n=>n.type==='blob'&&isHtml(n.path)).map(n=>n.path);
+  S.skipped=all.filter(skipReason).map(p=>[p,skipReason(p)]);
+  return all.filter(p=>!skipReason(p));
 }
 async function pool(items,fn,n=8){
   const out=new Array(items.length);let i=0;
   await Promise.all(Array.from({length:Math.min(n,items.length)},async()=>{while(i<items.length){const k=i++;out[k]=await fn(items[k])}}));
   return out;
 }
-async function getMeta(path){
+function parseMeta(path,text,url){
   const base=path.split('/').pop();
-  const m={path,folder:path.includes('/')?path.slice(0,path.lastIndexOf('/')):'',title:base.replace(/\.html$/i,''),icon:null};
+  const m={path,folder:path.includes('/')?path.slice(0,path.lastIndexOf('/')):'',title:base.replace(/\.html?$/i,''),icon:null};
   try{
-    const url=new URL(encodeURI(path),location.href),res=await fetch(url);
-    if(!res.ok)return m;
-    const doc=new DOMParser().parseFromString(await res.text(),'text/html');
-    const t=doc.querySelector('title')?.textContent.trim();if(t)m.title=t.replace(/\.html$/i,'').trim()||m.title;
+    if(!text)return m;
+    const doc=new DOMParser().parseFromString(text,'text/html');
+    const t=doc.querySelector('title')?.textContent.trim();if(t)m.title=t.replace(/\.html?$/i,'').trim()||m.title;
     const href=doc.querySelector('link[rel~="icon"], link[rel="shortcut icon"]')?.getAttribute('href');
     if(href)m.icon=/^data:/i.test(href)?href:new URL(href,url).href;
   }catch{}
   return m;
+}
+async function getMeta(path){
+  const url=new URL(encPath(path),location.href);
+  try{const res=await fetch(url);if(res.ok)return parseMeta(path,await res.text(),url)}catch{}
+  return parseMeta(path,'',url);
+}
+
+/* ---------- no-server mode (opened as file://) ---------- */
+const isFile=location.protocol==='file:';
+const FILE_KEY='mph_files_v1';
+function readFiles(){
+  try{const c=JSON.parse(store.get(FILE_KEY,'null'));if(c&&Array.isArray(c.metas)&&c.metas.length){S.scanned=c.t;return c.metas}}catch{}
+  return null;
+}
+async function scanPicked(files){
+  const items=files.map(f=>({f,path:(f.webkitRelativePath||'').split('/').slice(1).join('/')})).filter(x=>x.path);
+  if(!items.some(x=>x.path==='index.html'))throw new Error('that folder has no index.html at its top level. Pick the folder this dashboard lives in.');
+  const html=items.filter(x=>isHtml(x.path));
+  S.skipped=html.filter(x=>skipReason(x.path)).map(x=>[x.path,skipReason(x.path)]);
+  return pool(html.filter(x=>!skipReason(x.path)),async x=>parseMeta(x.path,await x.f.text(),new URL(encPath(x.path),location.href)));
+}
+function showPicker(msg){
+  $('tagline').textContent='Pick your games folder';
+  $('grid').querySelectorAll(':scope > :not(#viewer)').forEach(n=>n.remove());
+  const box=document.createElement('div');box.className='state';
+  const p=document.createElement('p');
+  p.textContent=msg||"Browsers can't list a folder on their own. Choose the folder that holds this index.html once, and the Playhouse will remember what it finds.";
+  const b=document.createElement('button');b.className='btn';b.textContent='Choose games folder';b.onclick=()=>$('picker').click();
+  box.append(p,b);$('viewer').before(box);
+}
+function initPicker(){
+  $('picker').onchange=async e=>{
+    const files=[...e.target.files];e.target.value='';
+    if(!files.length)return;
+    $('tagline').textContent='Reading games…';
+    try{
+      S.metas=await scanPicked(files);
+      store.set(FILE_KEY,JSON.stringify({t:Date.now(),metas:S.metas}));
+      render();route();
+      $('count').title=`${S.metas.length} games found, ${S.skipped.length} excluded`;
+    }catch(err){showPicker("Couldn't use that folder: "+err.message)}
+  };
 }
 
 /* ---------- rendering ---------- */
@@ -237,7 +319,7 @@ function visible(){
 }
 function makeCard(m){
   const w=document.createElement('div');w.className='cardwrap';
-  const a=document.createElement('a');a.className='card';a.href=encodeURI(m.path);a.dataset.path=m.path;
+  const a=document.createElement('a');a.className='card';a.href=encPath(m.path);a.dataset.path=m.path;
   const top=document.createElement('div');top.className='top';
   const img=document.createElement('img');img.alt='';img.loading='lazy';img.src=m.icon||defaultIcon(m.path);
   img.onerror=()=>{img.onerror=null;img.src=defaultIcon(m.path)};
@@ -259,11 +341,8 @@ function render(){
     if(S.sort==='folder'&&m.folder!==last){const h=document.createElement('h3');h.className='group';h.textContent=m.folder||'Top level';viewer.before(h);last=m.folder}
     viewer.before(makeCard(m));
   }
-  const folders=new Set(S.metas.map(m=>m.folder)).size,n=S.metas.length;
-  let t=S.list.length<n?`${S.list.length} of ${n} games`:`${n} ${n===1?'game':'games'} to play`;
-  if(folders>1&&S.list.length===n)t+=` in ${folders} folders`;
-  if(S.truncated)t+=' (list may be incomplete)';
-  $('tagline').textContent=t;
+  $('count').textContent=S.metas.length+(S.truncated?' (may be incomplete)':'');
+  $('tagline').textContent=TAGLINE;
 }
 
 /* ---------- mute shim for embedded games (same-origin) ---------- */
@@ -309,16 +388,16 @@ function mountFrame(src){
 }
 
 /* ---------- embedded player (hash routed) ---------- */
-const go=p=>{location.hash=p?'#/'+encodeURI(p):''};
+const go=p=>{location.hash=p?'#/'+encPath(p):''};
 function route(){
-  const p=location.hash.startsWith('#/')?decodeURI(location.hash.slice(2)):'';
+  const p=location.hash.startsWith('#/')?decodeURIComponent(location.hash.slice(2)):'';
   const m=S.metas.find(x=>x.path===p);
   if(m){
-    S.cur=p;$('vTitle').textContent=m.title;$('vNew').href=encodeURI(p);
-    if(S.shown!==p){mountFrame(encodeURI(p));S.shown=p}
+    const entering=!S.cur;S.cur=p;$('vTitle').textContent=m.title;if(entering&&$('autohide').checked)setHdr(true);$('vNew').href=encPath(p);
+    if(S.shown!==p){mountFrame(encPath(p));S.shown=p}
     $('viewer').hidden=false;document.body.classList.add('playing');document.title=m.title+' · Playhouse';
   }else if(S.cur||!$('viewer').hidden){
-    S.cur=null;S.shown=null;mountFrame('');$('viewer').hidden=true;
+    S.cur=null;S.shown=null;mountFrame('');$('viewer').hidden=true;if($('autohide').checked)setHdr(false);
     document.body.classList.remove('playing');document.title="Mika's Adorable Playhouse";
   }
 }
@@ -336,13 +415,23 @@ function readCache(){
 async function initDashboard(force=false){
   $('tagline').textContent='Looking for games…';
   try{
-    let metas=!force&&!isLocal?readCache():null;
+    if(isFile){
+      const c=force?null:readFiles();
+      if(c){S.metas=c;render();route();if(S.scanned)$('count').title='Last scanned '+new Date(S.scanned).toLocaleString();return}
+      showPicker();return;
+    }
+    S.skipped=[];let metas=!force&&!isLocal?readCache():null;const cached=!!metas;
     if(!metas){
       const files=await(isLocal?listLocal():listGitHub());
       metas=await pool(files,getMeta);
       if(!isLocal)store.set(CACHE_KEY,JSON.stringify({t:Date.now(),tr:S.truncated,metas}));
     }
     S.metas=metas;render();route();
+    console.groupCollapsed(`[Playhouse] ${metas.length} games found, ${S.skipped.length} excluded (${cached?'from cache':isLocal?'local directory listing':'GitHub API'})`);
+    console.table(metas.map(m=>({path:m.path,title:m.title})));
+    if(S.skipped.length)console.table(S.skipped.map(([path,why])=>({path,why})));
+    console.groupEnd();
+    $('count').title=`${metas.length} games found, ${S.skipped.length} excluded`;
   }catch(err){
     $('tagline').textContent='Could not load games';
     $('grid').querySelectorAll(':scope > :not(#viewer)').forEach(n=>n.remove());
@@ -355,7 +444,7 @@ function initUI(){
   $('search').oninput=e=>{S.q=e.target.value;render()};
   $('favOnly').onclick=e=>{S.favOnly=!S.favOnly;e.currentTarget.setAttribute('aria-pressed',S.favOnly);render();blip(600)};
   $('random').onclick=()=>{if(S.list.length){go(S.list[Math.floor(Math.random()*S.list.length)].path);blip(880)}};
-  $('refresh').onclick=()=>{store.del(CACHE_KEY);initDashboard(true)};
+  $('refresh').onclick=()=>{if(isFile){$('picker').click();return}store.del(CACHE_KEY);initDashboard(true)};
   $('grid').addEventListener('click',e=>{
     const star=e.target.closest('.star');
     if(star){const p=star.dataset.path;S.favs.has(p)?S.favs.delete(p):S.favs.add(p);store.set('favs',JSON.stringify([...S.favs]));blip(820);render();return}
@@ -363,19 +452,21 @@ function initUI(){
     if(card&&$('embed').checked&&!(e.metaKey||e.ctrlKey||e.shiftKey||e.altKey||e.button)){e.preventDefault();blip(880);go(card.dataset.path)}
   });
   $('vBack').onclick=()=>go('');
+  $('hideBtn').onclick=()=>setHdr(true);$('revealTab').onclick=()=>setHdr(false);
   $('vPrev').onclick=()=>step(-1);$('vNext').onclick=()=>step(1);
   $('vFull').onclick=()=>$('frame').requestFullscreen?.();
-  $('vReload').onclick=()=>{if(S.cur)mountFrame(encodeURI(S.cur))};
+  $('vReload').onclick=()=>{if(S.cur)mountFrame(encPath(S.cur))};
   window.addEventListener('hashchange',route);
   document.addEventListener('keydown',e=>{
     if(e.key==='Escape'){if(!$('settingsMenu').hidden)toggleMenu(false);else if(S.cur)go('');return}
     if(/INPUT|SELECT|TEXTAREA/.test(document.activeElement.tagName)||$('aboutDialog').open)return;
     if(e.key==='/'){e.preventDefault();$('search').focus()}
+    else if(e.key==='h'||e.key==='H')setHdr(!document.body.classList.contains('hdr-off'));
     else if(S.cur&&e.key==='ArrowRight')step(1);
     else if(S.cur&&e.key==='ArrowLeft')step(-1);
   });
 }
-document.addEventListener('DOMContentLoaded',()=>{initSettings();initUI();initDashboard()});
+document.addEventListener('DOMContentLoaded',()=>{initSettings();initUI();initPicker();initDashboard()});
 </script>
 </body>
 </html>
