@@ -4,7 +4,7 @@ A collection of educational games for toddlers and kids, all in one cozy place.
 
 This repo is a set of small, self-contained HTML games plus a single-file dashboard (`index.html`) that finds them automatically and lets kids pick one to play. Add a game, push it, and it shows up. No build step, no config file, no list to maintain.
 
-**Live site:** https://kungpowunicorn.github.io/map/
+**[Live site](https://kungpowunicorn.github.io/map/)**
 
 ## Features
 
