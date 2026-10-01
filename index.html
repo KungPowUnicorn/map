@@ -76,7 +76,7 @@ body[data-density=roomy]{--min:340px;--gap:28px}
       <div><div class="row" style="margin-bottom:8px">Color theme</div><div class="swatches" id="swatches"></div></div>
       <label class="row">Card size<select id="density"><option value="compact">Compact</option><option value="cozy">Cozy</option><option value="roomy">Roomy</option></select></label>
       <label class="row">Play inside dashboard<input type="checkbox" id="embed"></label>
-      <label class="row">Sound effects<input type="checkbox" id="sound"></label>
+      <label class="row">Sound<input type="checkbox" id="sound"></label>
     </div>
     <button class="btn" id="aboutBtn">About</button>
   </div>
@@ -171,12 +171,13 @@ function initSettings(){
   applyTheme(store.get('theme',matchMedia('(prefers-color-scheme: dark)').matches?'midnight':'sunny'));
   const d=store.get('density','cozy');$('density').value=d;document.body.dataset.density=d;
   $('density').onchange=e=>{document.body.dataset.density=e.target.value;store.set('density',e.target.value);blip(600)};
-  $('sound').checked=store.get('sound','off')==='on';
-  $('sound').onchange=e=>{store.set('sound',e.target.checked?'on':'off');blip(780)};
+  $('sound').checked=store.get('sound','on')==='on';
+  $('sound').onchange=e=>{store.set('sound',e.target.checked?'on':'off');syncMute();blip(780)};
   $('embed').checked=store.get('embed','on')==='on';
   $('embed').onchange=e=>store.set('embed',e.target.checked?'on':'off');
   $('settingsBtn').onclick=e=>{e.stopPropagation();toggleMenu($('settingsMenu').hidden)};
-  document.addEventListener('click',e=>{if(!$('settingsMenu').contains(e.target))toggleMenu(false)});
+  document.addEventListener('pointerdown',e=>{if(!$('settingsMenu').contains(e.target)&&!$('settingsBtn').contains(e.target))toggleMenu(false)});
+  window.addEventListener('blur',()=>{if(document.activeElement===$('frame'))toggleMenu(false)});
   $('aboutBtn').onclick=()=>{blip(700);$('aboutDialog').showModal()};
   $('aboutClose').onclick=()=>$('aboutDialog').close();
   $('aboutDialog').addEventListener('click',e=>{if(e.target===e.currentTarget)e.currentTarget.close()});
@@ -265,6 +266,48 @@ function render(){
   $('tagline').textContent=t;
 }
 
+/* ---------- mute shim for embedded games (same-origin) ---------- */
+function shim(win){
+  try{
+    if(!win)return;
+    if(win.__mph)return win.__mph;
+    const st=win.__mph={muted:!$('sound').checked,gains:new Set(),media:new Set()};
+    const NP=win.AudioNode.prototype,oc=NP.connect,od=NP.disconnect;
+    NP.connect=function(d,...a){
+      if(d instanceof win.AudioDestinationNode){
+        const c=d.context;
+        if(!c.__mg){const g=c.createGain();oc.call(g,d);g.gain.value=st.muted?0:1;st.gains.add(g);c.__mg=g}
+        oc.call(this,c.__mg,...a);return d;
+      }
+      return oc.call(this,d,...a);
+    };
+    NP.disconnect=function(...a){
+      if(a[0] instanceof win.AudioDestinationNode&&a[0].context.__mg)a[0]=a[0].context.__mg;
+      return od.apply(this,a);
+    };
+    const M=win.HTMLMediaElement.prototype,play=M.play;
+    M.play=function(){st.media.add(this);if(st.muted&&!this.muted){this.__m=1;this.muted=true}return play.apply(this,arguments)};
+    const ss=win.speechSynthesis;
+    if(ss){const sp=ss.speak.bind(ss);ss.speak=u=>{if(!st.muted)sp(u)}}
+    st.set=m=>{
+      st.muted=m;
+      st.gains.forEach(g=>{g.gain.value=m?0:1});
+      win.document.querySelectorAll('audio,video').forEach(e=>st.media.add(e));
+      st.media.forEach(el=>{if(m){if(!el.muted){el.__m=1;el.muted=true}}else if(el.__m){el.muted=false;el.__m=0}});
+      if(m)try{win.speechSynthesis.cancel()}catch{}
+    };
+    return st;
+  }catch{}
+}
+function syncMute(){const st=shim($('frame').contentWindow);if(st)st.set(!$('sound').checked)}
+function mountFrame(src){
+  const f=document.createElement('iframe');f.id='frame';f.title='Game';f.allow='autoplay; fullscreen';
+  $('frame').replaceWith(f);
+  syncMute();
+  f.addEventListener('load',syncMute);
+  if(src)f.src=src;
+}
+
 /* ---------- embedded player (hash routed) ---------- */
 const go=p=>{location.hash=p?'#/'+encodeURI(p):''};
 function route(){
@@ -272,10 +315,10 @@ function route(){
   const m=S.metas.find(x=>x.path===p);
   if(m){
     S.cur=p;$('vTitle').textContent=m.title;$('vNew').href=encodeURI(p);
-    if($('frame').getAttribute('src')!==encodeURI(p))$('frame').src=encodeURI(p);
+    if(S.shown!==p){mountFrame(encodeURI(p));S.shown=p}
     $('viewer').hidden=false;document.body.classList.add('playing');document.title=m.title+' · Playhouse';
   }else if(S.cur||!$('viewer').hidden){
-    S.cur=null;$('frame').removeAttribute('src');$('viewer').hidden=true;
+    S.cur=null;S.shown=null;mountFrame('');$('viewer').hidden=true;
     document.body.classList.remove('playing');document.title="Mika's Adorable Playhouse";
   }
 }
@@ -322,7 +365,7 @@ function initUI(){
   $('vBack').onclick=()=>go('');
   $('vPrev').onclick=()=>step(-1);$('vNext').onclick=()=>step(1);
   $('vFull').onclick=()=>$('frame').requestFullscreen?.();
-  $('vReload').onclick=()=>{try{$('frame').contentWindow.location.reload()}catch{$('frame').src=$('frame').src}};
+  $('vReload').onclick=()=>{if(S.cur)mountFrame(encodeURI(S.cur))};
   window.addEventListener('hashchange',route);
   document.addEventListener('keydown',e=>{
     if(e.key==='Escape'){if(!$('settingsMenu').hidden)toggleMenu(false);else if(S.cur)go('');return}
