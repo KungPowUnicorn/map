@@ -87,6 +87,7 @@ input[type=checkbox]{width:26px;height:26px;accent-color:var(--accent)}
     <div class="row"><label>Points per correct match<small>A wrong match always costs 1.</small></label><div class="seg" data-k="pts"><button data-v="1">1</button><button data-v="5">5</button><button data-v="10">10</button><button data-v="20">20</button></div></div>
     <div class="row"><label>Shapes per round<small>Applies from the next round.</small></label><div class="seg" data-k="n"><button data-v="4">4</button><button data-v="6">6</button><button data-v="8">8</button></div></div>
     <div class="row"><label>Theme</label><div class="seg" data-k="theme"><button data-v="auto">Auto</button><button data-v="light">Light</button><button data-v="dark">Dark</button></div></div>
+    <div class="row"><label for="say">Call out shape names<small>Speaks the name when you pick a shape up.</small></label><input type="checkbox" id="say"></div>
     <div class="row"><label for="snd">Sound</label><input type="checkbox" id="snd"></div>
     <div class="row"><label for="vib">Vibrate on mistakes</label><input type="checkbox" id="vib"></div>
     <div class="row"><label for="hint">Highlight hole while dragging</label><input type="checkbox" id="hint"></div>
@@ -111,10 +112,12 @@ heart:'<path d="M50 88C10 58 6 34 24 22c12-8 22-2 26 8 4-10 14-16 26-8 18 12 14 
 cross:'<polygon points="36,8 64,8 64,36 92,36 92,64 64,64 64,92 36,92 36,64 8,64 8,36 36,36"/>'};
 const COL={circle:'#ef476f',square:'#ffc233',triangle:'#06c28f',star:'#ff8a1f',hexagon:'#3db8e8',diamond:'#9b5de5',heart:'#f15bb5',cross:'#2ec4b6'};
 const $=s=>document.querySelector(s),$$=s=>[...document.querySelectorAll(s)];
-let S={pts:5,n:4,theme:'auto',snd:true,vib:true,hint:true};
+let S={pts:5,n:4,theme:'auto',snd:true,say:true,vib:true,hint:true};
 try{Object.assign(S,JSON.parse(localStorage.getItem('shapesorter')||'{}'))}catch(e){}
 const save=()=>{try{localStorage.setItem('shapesorter',JSON.stringify(S))}catch(e){}};
 let score=1,over=false,left=0,drag=null,ac=null;
+function say(t){if(!S.say||!window.speechSynthesis)return;try{speechSynthesis.cancel();const u=new SpeechSynthesisUtterance(t);u.rate=.95;u.pitch=1.1;speechSynthesis.speak(u)}catch(e){}}
+const NAME={cross:'plus'};
 const svg=k=>`<svg viewBox="0 0 100 100" aria-hidden="true">${SH[k]}</svg>`;
 const shuffle=a=>{for(let i=a.length-1;i>0;i--){const j=Math.random()*(i+1)|0;[a[i],a[j]]=[a[j],a[i]]}return a};
 function tone(f,d=.12,t='sine'){if(!S.snd)return;try{ac=ac||new(window.AudioContext||window.webkitAudioContext)();const o=ac.createOscillator(),g=ac.createGain();o.type=t;o.frequency.value=f;g.gain.setValueAtTime(.08,ac.currentTime);g.gain.exponentialRampToValueAtTime(.001,ac.currentTime+d);o.connect(g);g.connect(ac.destination);o.start();o.stop(ac.currentTime+d)}catch(e){}}
@@ -163,7 +166,7 @@ const back=p=>{p.style.transition='transform .28s cubic-bezier(.3,1.5,.5,1)';p.s
 $('#tray').addEventListener('pointerdown',e=>{
   const p=e.target.closest('.piece');if(!p||over||drag)return;
   e.preventDefault();p.setPointerCapture(e.pointerId);
-  drag={p,x:e.clientX,y:e.clientY,id:e.pointerId};p.classList.add('drag');p.style.transition='none';tone(440,.05);
+  drag={p,x:e.clientX,y:e.clientY,id:e.pointerId};p.classList.add('drag');p.style.transition='none';tone(440,.05);say(NAME[p.dataset.k]||p.dataset.k);
 });
 addEventListener('pointermove',e=>{
   if(!drag||e.pointerId!==drag.id)return;
@@ -176,10 +179,10 @@ function drop(e){
   const h=e.type==='pointercancel'?null:nearest(p);p.classList.remove('drag');
   if(!h){back(p);return}
   if(h.dataset.k===p.dataset.k){
-    h.classList.add('filled','pop');p.remove();left--;tone(660,.1);setTimeout(()=>tone(880,.15),90);add(S.pts);
+    h.classList.add('filled','pop');p.remove();left--;say('Great!');tone(660,.1);setTimeout(()=>tone(880,.15),90);add(S.pts);
     if(!over&&!left)setTimeout(()=>{if(!over)round()},700);
   }else{
-    h.classList.add('bad');setTimeout(()=>h.classList.remove('bad'),400);back(p);tone(150,.25,'square');add(-1);
+    h.classList.add('bad');setTimeout(()=>h.classList.remove('bad'),400);back(p);tone(150,.25,'square');say('Try again');add(-1);
   }
 }
 addEventListener('pointerup',drop);addEventListener('pointercancel',drop);
@@ -187,10 +190,10 @@ addEventListener('pointerup',drop);addEventListener('pointercancel',drop);
 function theme(){if(S.theme==='auto')document.documentElement.removeAttribute('data-theme');else document.documentElement.setAttribute('data-theme',S.theme)}
 function sync(){
   $$('.seg').forEach(s=>$$('#set .seg[data-k="'+s.dataset.k+'"] button').forEach(b=>b.classList.toggle('on',b.dataset.v==String(S[s.dataset.k]))));
-  ['snd','vib','hint'].forEach(k=>$('#'+k).checked=S[k]);theme();
+  ['snd','say','vib','hint'].forEach(k=>$('#'+k).checked=S[k]);theme();
 }
 $$('.seg button').forEach(b=>b.onclick=()=>{const k=b.parentNode.dataset.k;S[k]=isNaN(b.dataset.v)?b.dataset.v:+b.dataset.v;save();sync()});
-['snd','vib','hint'].forEach(k=>$('#'+k).onchange=e=>{S[k]=e.target.checked;save()});
+['snd','say','vib','hint'].forEach(k=>$('#'+k).onchange=e=>{S[k]=e.target.checked;save()});
 const reset=()=>{score=1;over=false;$('#end').hidden=true;$('#set').hidden=true;render();round()};
 $('#gear').onclick=()=>$('#set').hidden=false;
 $('#close').onclick=()=>$('#set').hidden=true;
