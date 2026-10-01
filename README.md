@@ -37,5 +37,3 @@ The dashboard refreshes its file list every 10 minutes. Use the ↻ button to re
 ## Support
 
 If the Playhouse made someone's day, you can say thanks on [Ko-fi](https://ko-fi.com/kungpowunicorn).
-
-Made with ❤️ by [KungPowUnicorn](https://ko-fi.com/kungpowunicorn).
