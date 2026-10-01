@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
-<title>Number Fireworks</title>
+<title>Number Finder</title>
 <style>
   :root{ --safe-t:env(safe-area-inset-top,0px); --safe-b:env(safe-area-inset-bottom,0px); }
   *{ box-sizing:border-box; -webkit-user-select:none; user-select:none; -webkit-touch-callout:none; }
@@ -67,8 +67,8 @@
   #gameTitle{ font-weight:900; font-size:clamp(15px,4.2vw,21px); text-shadow:0 2px 4px #0007; white-space:nowrap; }
   #scoreMini{ display:flex; gap:10px; font-weight:800; font-size:clamp(12px,3.2vw,15px); background:#ffffff22; border-radius:14px; padding:5px 12px; }
   #gearBtn{ flex:none; width:38px; height:38px; border-radius:50%; border:none; background:#ffffff33; color:#fff; font-size:18px; }
-  #gate,#settings{ position:fixed; inset:0; z-index:200; background:#111a; display:none; align-items:center; justify-content:center; }
-  #gate.show,#settings.show{ display:flex; }
+  #settings{ position:fixed; inset:0; z-index:200; background:#111a; display:none; align-items:center; justify-content:center; }
+  #settings.show{ display:flex; }
   .panel{ background:#1c2350; color:#fff; padding:22px; border-radius:18px; width:min(92vw,420px); max-height:88vh; overflow:auto; }
   .panel h3{ margin-top:0; }
   .row{ display:flex; align-items:center; justify-content:space-between; margin:14px 0; gap:10px; }
@@ -76,7 +76,6 @@
   .opt{ background:#3a4590; color:#fff; }
   .opt.active{ background:#5be584; color:#08351a; font-weight:800; }
   .optrow{ display:flex; gap:6px; flex-wrap:wrap; }
-  input#gateAns{ font-size:20px; width:70px; padding:8px; border-radius:10px; border:none; text-align:center; }
   .closeBtn{ display:block; margin:16px auto 0; background:#ff5f6d; color:#fff; border:none; padding:10px 22px; border-radius:12px; font-weight:800; }
 </style>
 </head>
@@ -113,15 +112,6 @@
     <span class="paradeChar" style="animation-delay:-6.6s,.05s">🦁</span>
   </div>
   <div id="finaleHint">✨ Tap to play again! ✨</div>
-</div>
-
-<div id="gate">
-  <div class="panel">
-    <h3 id="gateQ">Parent Check</h3>
-    <input id="gateAns" type="number" inputmode="numeric">
-    <div style="margin-top:14px"><button class="opt" id="gateGo">OK</button></div>
-    <button class="closeBtn" id="gateCancel">Cancel</button>
-  </div>
 </div>
 
 <div id="settings">
@@ -207,7 +197,7 @@ function resetReport(){
   }
 }
 
-let gauge = 0, current = null, order = [], idx = 0, hintTimer=null, broken=false, gateExpected=null;
+let gauge = 0, current = null, order = [], idx = 0, hintTimer=null, broken=false;
 
 // ---------- audio synth ----------
 let actx;
@@ -401,18 +391,8 @@ function restart(){
   if(cfg.mode!=='free') nextTarget(); else promptEl.textContent='Tap any number!';
 }
 
-// ---------- parental gate ----------
-const gateEl=document.getElementById('gate'), gateQ=document.getElementById('gateQ'), gateAns=document.getElementById('gateAns');
-document.getElementById('gearBtn').addEventListener('click', ()=>{
-  const a=1+Math.floor(Math.random()*6), b=1+Math.floor(Math.random()*6);
-  gateExpected = a+b; gateQ.textContent = `Parent check: What is ${a} + ${b}?`;
-  gateAns.value=''; gateEl.classList.add('show');
-});
-document.getElementById('gateCancel').addEventListener('click', ()=>gateEl.classList.remove('show'));
-document.getElementById('gateGo').addEventListener('click', ()=>{
-  if(+gateAns.value===gateExpected){ gateEl.classList.remove('show'); openSettings(); }
-  else { gateQ.textContent='Not quite — try again!'; }
-});
+// ---------- settings access ----------
+document.getElementById('gearBtn').addEventListener('click', openSettings);
 
 // ---------- settings panel ----------
 const settingsEl=document.getElementById('settings');
