@@ -28,8 +28,6 @@ The dashboard refreshes its file list every 10 minutes. Use the ↻ button to re
 
 ## Known limitations
 
-- **Repo and branch are hardcoded** to `KungPowUnicorn/map` and `main` in `index.html`. If you fork this, change the `REPO` constant and the branch in the tree URL.
-- **Very large repos:** GitHub can truncate the file tree response. The dashboard notes when the list may be incomplete.
 - **Embedded games share the same origin**, so two games using the same `localStorage` key can overwrite each other's saved data. Use unique keys per game.
 - **Games that redirect the top window** (`window.top.location`) won't behave inside the embedded player. Turn off *Play inside dashboard* in Settings to open games in a new tab instead.
 - **New files can appear before Pages has deployed them.** If a card opens a blank page, wait a minute and try again.
