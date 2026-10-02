@@ -55,11 +55,11 @@ small{color:var(--mute)}
 <div id="modal"><div class="panel">
   <h2 style="margin:0 0 6px">Settings</h2>
   <div class="row"><span>Sound effects</span><input type="checkbox" id="sSnd"></div>
-  <div class="row"><span>Speak colors</span><input type="checkbox" id="sSpk"></div>
+  <div class="row"><span>Speak</span><div class="seg" id="sSpk"><button data-v="off">Off</button><button data-v="color">Colors</button><button data-v="num">Numbers</button></div></div>
   <div class="row"><span>Highlight next dot</span><input type="checkbox" id="sHint"></div>
   <div class="row"><span>Vibrate on miss</span><input type="checkbox" id="sVib"></div>
   <div class="row"><span>Theme</span><div class="seg" id="sTheme"><button data-v="auto">Auto</button><button data-v="light">Light</button><button data-v="dark">Dark</button></div></div>
-  <div class="row" style="display:block"><div style="margin-bottom:8px">Wrong-tap penalty <small>(points lost)</small></div><div class="seg" id="sPen"><button data-v="1">1</button><button data-v="5">5</button><button data-v="10">10</button><button data-v="20">20</button></div></div>
+  <div class="row" style="display:block"><div style="margin-bottom:8px">Points per correct dot <small>(wrong tap is always -1)</small></div><div class="seg" id="sPen"><button data-v="1">1</button><button data-v="5">5</button><button data-v="10">10</button><button data-v="20">20</button></div></div>
   <button class="big" id="newg">New game</button>
   <button class="big" id="close" style="background:var(--bg);color:var(--ink);border:1px solid var(--line)">Close</button>
   <div class="credit">Made With ❤️ By <a href="https://ko-fi.com/kungpowunicorn" target="_blank" rel="noopener">KungPowUnicorn</a></div>
@@ -77,7 +77,7 @@ const SHAPES=[
  {n:"Heart",p:heart},
  {n:"Gem",p:[[30,20],[50,20],[70,20],[88,40],[69,64],[50,88],[31,64],[12,40]]}
 ];
-const OK=2,BONUS=10;
+
 const P=s=>s.trim().split(/\s+/).map(t=>t.split(",").map(Number));
 const starN=(n,o,i,cy=50)=>r1(Array.from({length:2*n},(_,k)=>{const r=k%2?i:o,a=-Math.PI/2+k*Math.PI/n;return[50+r*Math.cos(a),cy+r*Math.sin(a)]}));
 const poly=(n,k,cy=50,r=42,rot=-90)=>{const v=Array.from({length:n},(_,j)=>{const a=(rot+j*360/n)*Math.PI/180;return[50+r*Math.cos(a),cy+r*Math.sin(a)]}),o=[];v.forEach((p,j)=>{const q=v[(j+1)%n];for(let t=0;t<k;t++)o.push([p[0]+(q[0]-p[0])*t/k,p[1]+(q[1]-p[1])*t/k])});return r1(o)};
@@ -109,14 +109,14 @@ const EXTRA={
  Pizza:P("8,24 24,16 42,12 58,12 76,16 92,24 71,59 50,94 29,59")
 };
 Object.entries(EXTRA).forEach(([n,p])=>SHAPES.push({n,p}));
-SHAPES.sort((a,b)=>a.p.length-b.p.length);
-let S={snd:true,spk:true,hint:true,vib:true,theme:"auto",pen:1};
+const shuffle=()=>{for(let i=SHAPES.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[SHAPES[i],SHAPES[j]]=[SHAPES[j],SHAPES[i]]}};shuffle();
+let S={snd:true,spk:"color",hint:true,vib:true,theme:"auto",pts:5};
 try{Object.assign(S,JSON.parse(localStorage.getItem("ctd")||"{}"))}catch(e){}
-const save=()=>{try{localStorage.setItem("ctd",JSON.stringify(S))}catch(e){}};
+if(typeof S.spk==="boolean")S.spk=S.spk?"color":"off";const save=()=>{try{localStorage.setItem("ctd",JSON.stringify(S))}catch(e){}};
 let score=1,si=0,nx=0,lock=false,over=false,ac;
 
 function beep(f,d=.12,type="sine",v=.15){if(!S.snd)return;try{ac=ac||new(window.AudioContext||window.webkitAudioContext)();const o=ac.createOscillator(),g=ac.createGain();o.type=type;o.frequency.value=f;g.gain.value=v;g.gain.exponentialRampToValueAtTime(.001,ac.currentTime+d);o.connect(g);g.connect(ac.destination);o.start();o.stop(ac.currentTime+d)}catch(e){}}
-function say(t){if(!S.spk||!window.speechSynthesis)return;try{speechSynthesis.cancel();const u=new SpeechSynthesisUtterance(t);u.rate=1.05;speechSynthesis.speak(u)}catch(e){}}
+function say(t){if(S.spk==="off"||!window.speechSynthesis)return;try{speechSynthesis.cancel();const u=new SpeechSynthesisUtterance(t);u.rate=1.05;speechSynthesis.speak(u)}catch(e){}}
 
 function gauge(){const f=$("fill");f.style.width=Math.max(score,0)+"%";f.style.background=score<25?"#ef4444":score<60?"#f59e0b":"#22c55e";$("num").textContent=score+" / 100"}
 function status(){const sh=SHAPES[si%SHAPES.length];$("pic").textContent="Picture "+(si+1);$("nxt").innerHTML=nx<sh.p.length?"Next: <b>"+(nx+1)+"</b> · "+COLORS[nx%8][0]:"Done!"}
@@ -135,7 +135,7 @@ $("svg").addEventListener("pointerdown",e=>{
   const i=+d.dataset.i,sh=SHAPES[si%SHAPES.length];
   if(d.classList.contains("done"))return;
   if(i!==nx){
-    score-=S.pen;gauge();beep(140,.25,"sawtooth",.12);
+    score--;gauge();beep(140,.25,"sawtooth",.12);
     d.classList.add("bad");setTimeout(()=>d.classList.remove("bad"),250);
     if(S.vib&&navigator.vibrate)try{navigator.vibrate(60)}catch(_){}
     if(score<=0){score=0;gauge();end(false)}
@@ -144,38 +144,38 @@ $("svg").addEventListener("pointerdown",e=>{
   const [name,col]=COLORS[i%8];
   d.classList.add("done");d.classList.remove("hint");d.querySelector("circle").style.fill=col;
   if(i>0)seg(sh.p[i-1],sh.p[i],col);
-  score=Math.min(100,score+OK);gauge();beep(330+i*35);say(name);nx++;
+  score=Math.min(100,score+S.pts);gauge();beep(330+i*35);say(S.spk==="num"?String(i+1):name);nx++;
   if(score>=100){if(nx===sh.p.length)closeShape(sh);end(true);return}
   if(nx===sh.p.length){closeShape(sh);done(sh)}else{status();hint()}
 });
 function closeShape(sh){seg(sh.p[sh.p.length-1],sh.p[0],COLORS[(sh.p.length-1)%8][1]);const f=$("fillp");f.setAttribute("points",sh.p.map(p=>p.join(",")).join(" "));f.setAttribute("fill",COLORS[si%8][1]);f.setAttribute("fill-opacity",".25")}
 function done(sh){
-  lock=true;status();score=Math.min(100,score+BONUS);gauge();
+  lock=true;status();
   [523,659,784].forEach((f,k)=>setTimeout(()=>beep(f,.2),k*120));
   setTimeout(()=>say((/^[AEIOU]/.test(sh.n)?"An ":"A ")+sh.n+"!"),350);
   const t=document.createElementNS("http://www.w3.org/2000/svg","text");
-  t.setAttribute("x",50);t.setAttribute("y",50);t.setAttribute("text-anchor","middle");t.setAttribute("font-size","9");t.setAttribute("font-weight","800");t.setAttribute("fill","currentColor");t.setAttribute("stroke","var(--card)");t.setAttribute("stroke-width","1.5");t.setAttribute("paint-order","stroke");t.textContent=sh.n+"! +"+BONUS;$("svg").appendChild(t);
+  t.setAttribute("x",50);t.setAttribute("y",50);t.setAttribute("text-anchor","middle");t.setAttribute("font-size","9");t.setAttribute("font-weight","800");t.setAttribute("fill","currentColor");t.setAttribute("stroke","var(--card)");t.setAttribute("stroke-width","1.5");t.setAttribute("paint-order","stroke");t.textContent=sh.n+"!";$("svg").appendChild(t);
   setTimeout(()=>{if(over)return;if(score>=100){end(true);return}si++;build()},1900);
 }
 function end(win){
   over=true;lock=true;
   $("ot").textContent=win?"🎉":"💥";$("oh").textContent=win?"You win!":"Game over";
-  $("op").textContent=win?"Gauge hit 100. "+(si+(nx?1:0))+" picture(s) touched.":"The gauge hit 0. Wrong taps cost "+S.pen+" each.";
+  $("op").textContent=win?"Gauge hit 100. "+(si+(nx?1:0))+" picture(s) touched.":"The gauge hit 0. Each wrong tap costs 1.";
   if(win)[523,659,784,1047].forEach((f,k)=>setTimeout(()=>beep(f,.25),k*130));else beep(90,.6,"sawtooth",.15);
   setTimeout(()=>$("over").classList.add("open"),win?500:300);
 }
-function newGame(){over=false;score=1;si=0;$("over").classList.remove("open");$("modal").classList.remove("open");try{speechSynthesis.cancel()}catch(e){}gauge();build()}
+function newGame(){over=false;score=1;si=0;shuffle();$("over").classList.remove("open");$("modal").classList.remove("open");try{speechSynthesis.cancel()}catch(e){}gauge();build()}
 
 function theme(){document.documentElement.removeAttribute("data-theme");if(S.theme!=="auto")document.documentElement.setAttribute("data-theme",S.theme)}
 function sync(){
-  $("sSnd").checked=S.snd;$("sSpk").checked=S.spk;$("sHint").checked=S.hint;$("sVib").checked=S.vib;
+  $("sSnd").checked=S.snd;$("sHint").checked=S.hint;$("sVib").checked=S.vib;
   document.querySelectorAll("#sTheme button").forEach(b=>b.classList.toggle("on",b.dataset.v===S.theme));
-  document.querySelectorAll("#sPen button").forEach(b=>b.classList.toggle("on",+b.dataset.v===S.pen));
+  document.querySelectorAll("#sSpk button").forEach(b=>b.classList.toggle("on",b.dataset.v===S.spk));document.querySelectorAll("#sPen button").forEach(b=>b.classList.toggle("on",+b.dataset.v===S.pts));
   theme();save();
 }
-[["sSnd","snd"],["sSpk","spk"],["sHint","hint"],["sVib","vib"]].forEach(([id,k])=>$(id).onchange=e=>{S[k]=e.target.checked;sync();if(k==="hint")hint()});
+[["sSnd","snd"],["sHint","hint"],["sVib","vib"]].forEach(([id,k])=>$(id).onchange=e=>{S[k]=e.target.checked;sync();if(k==="hint")hint()});
 document.querySelectorAll("#sTheme button").forEach(b=>b.onclick=()=>{S.theme=b.dataset.v;sync()});
-document.querySelectorAll("#sPen button").forEach(b=>b.onclick=()=>{S.pen=+b.dataset.v;sync()});
+document.querySelectorAll("#sPen button").forEach(b=>b.onclick=()=>{S.pts=+b.dataset.v;sync()});document.querySelectorAll("#sSpk button").forEach(b=>b.onclick=()=>{S.spk=b.dataset.v;sync();say(S.spk==="num"?"One":"Red")});
 $("gear").onclick=()=>$("modal").classList.add("open");
 $("close").onclick=()=>$("modal").classList.remove("open");
 $("modal").onclick=e=>{if(e.target.id==="modal")$("modal").classList.remove("open")};
