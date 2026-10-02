@@ -1,4 +1,4 @@
-# 🦄 Mika's Adorable Playhouse
+# Mika's Adorable Playhouse
 
 A collection of educational games for toddlers and kids, all in one cozy place.
 
