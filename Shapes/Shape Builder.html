@@ -25,7 +25,7 @@ button{font-family:inherit;color:inherit;cursor:pointer}
 .stage svg{width:100%;height:100%;display:block}
 #fname{position:absolute;top:8px;left:12px;font-size:12px;color:var(--mut);font-weight:700}
 #toast{position:absolute;left:10px;right:10px;bottom:10px;display:flex;flex-direction:column;align-items:center;gap:2px;font-size:20px;font-weight:800;text-align:center;background:var(--acc);color:#fff;border-radius:16px;padding:10px 14px;box-shadow:0 4px 16px rgba(0,0,0,.3)}
-#toast .btn{background:#fff;color:#5b34d6;font-size:16px;padding:8px 22px;margin-top:6px}
+#toast small{font-size:13px;font-weight:600;opacity:.9}
 .prompt{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:0 14px 8px;font-size:20px;font-weight:700}
 #say{width:44px;height:44px;border-radius:50%;border:2px solid var(--line);background:var(--card);font-size:20px;flex:none}
 .tray{display:grid;grid-template-columns:repeat(5,1fr);gap:8px;padding:0 14px 14px}
@@ -56,7 +56,7 @@ button{font-family:inherit;color:inherit;cursor:pointer}
 <body>
 <header><h1>🧩 Shape Builder</h1><button id="gear" aria-label="Settings">⚙️</button></header>
 <div class="gauge" role="progressbar" aria-valuemin="0" aria-valuemax="100"><div id="fill"></div><div id="gnum">1 / 100</div></div>
-<div class="stage"><div id="fname"></div><svg id="stage" viewBox="0 0 200 190"></svg><div id="toast" hidden><span id="ttxt"></span><button class="btn" id="cont">Continue ▶</button></div></div>
+<div class="stage"><div id="fname"></div><svg id="stage" viewBox="0 0 200 190"></svg><div id="toast" hidden><span id="ttxt"></span><small>Tap anywhere to continue</small></div></div>
 <div class="prompt"><span id="ptxt">&nbsp;</span><button id="say" aria-label="Repeat">🔊</button></div>
 <div class="tray" id="tray"></div>
 
@@ -82,7 +82,7 @@ button{font-family:inherit;color:inherit;cursor:pointer}
 </div></div>
 
 <script>
-const COL={red:'#e53935',blue:'#1e88e5',green:'#43a047',yellow:'#fdd835',orange:'#fb8c00',purple:'#8e24aa',pink:'#ec407a',brown:'#795548',gray:'#78909c'};
+const COL={red:'#e53935',blue:'#1e88e5',green:'#43a047',yellow:'#fdd835',orange:'#fb8c00',purple:'#8e24aa',pink:'#ec407a',brown:'#795548',gray:'#78909c',white:'#fafafa',black:'#263238'};
 const SH=['square','rectangle','circle','triangle'];
 // part: [shape,color,x,y,w,h,rotation]
 const FIGS=[
@@ -90,7 +90,20 @@ const FIGS=[
 {n:'Robot',p:[['rectangle','gray',70,28,60,45],['triangle','red',94,10,12,18],['circle','yellow',80,40,12,12],['circle','yellow',108,40,12,12],['rectangle','blue',62,76,76,60],['square','red',94,96,12,12],['rectangle','orange',42,80,16,50],['rectangle','orange',142,80,16,50],['rectangle','green',72,138,20,38],['rectangle','green',108,138,20,38]]},
 {n:'Cat',p:[['circle','orange',50,92,100,78],['circle','orange',68,38,64,58],['triangle','orange',70,18,24,28],['triangle','orange',106,18,24,28],['circle','green',84,58,12,12],['circle','green',104,58,12,12],['triangle','pink',95,74,10,8],['rectangle','brown',148,118,34,10]]},
 {n:'Rocket',p:[['rectangle','purple',75,55,50,85],['triangle','red',75,22,50,34],['circle','blue',88,72,24,24],['triangle','red',50,112,26,32],['triangle','red',124,112,26,32],['triangle','orange',88,140,24,32,180]]},
-{n:'Car',p:[['rectangle','red',30,100,140,40],['rectangle','blue',68,68,64,34],['circle','gray',48,125,34,34],['circle','gray',118,125,34,34],['circle','yellow',156,106,12,12]]}
+{n:'Car',p:[['rectangle','red',30,100,140,40],['rectangle','blue',68,68,64,34],['circle','gray',48,125,34,34],['circle','gray',118,125,34,34],['circle','yellow',156,106,12,12]]},
+{n:'Snowman',p:[['circle','white',60,110,80,75],['circle','white',72,70,56,50],['circle','white',82,38,36,36],['rectangle','brown',78,35,44,5],['rectangle','brown',86,18,28,18],['circle','blue',91,48,6,6],['circle','blue',104,48,6,6],['triangle','orange',97,56,6,12],['circle','red',96,80,8,8],['circle','red',96,96,8,8]]},
+{n:'Fish',p:[['circle','orange',50,70,90,60],['triangle','red',135,80,40,40,270],['triangle','red',85,50,30,25],['circle','blue',65,88,10,10],['circle','blue',28,62,8,8],['circle','blue',20,44,6,6]]},
+{n:'Tree',p:[['rectangle','brown',90,120,20,60],['circle','green',55,45,90,85],['circle','red',80,80,10,10],['circle','red',112,95,10,10],['circle','yellow',155,12,30,30]]},
+{n:'Butterfly',p:[['circle','purple',50,45,50,50],['circle','purple',100,45,50,50],['circle','pink',60,98,40,40],['circle','pink',100,98,40,40],['rectangle','brown',96,60,8,75],['circle','brown',93,46,14,14]]},
+{n:'Duck',p:[['circle','yellow',45,92,100,70],['circle','yellow',110,48,48,48],['triangle','orange',154,66,14,14,90],['circle','blue',134,64,8,8],['circle','orange',65,108,45,32],['rectangle','orange',80,160,6,18],['rectangle','orange',108,160,6,18]]},
+{n:'Castle',p:[['rectangle','gray',50,90,100,80],['rectangle','gray',32,60,32,110],['rectangle','gray',136,60,32,110],['triangle','red',28,32,40,30],['triangle','red',132,32,40,30],['rectangle','brown',88,125,24,45],['square','blue',74,100,12,12],['square','blue',114,100,12,12]]},
+{n:'Sailboat',p:[['rectangle','brown',35,142,130,24],['rectangle','brown',98,40,5,102],['triangle','blue',45,62,52,78],['triangle','red',106,50,50,90],['circle','yellow',150,8,30,30]]},
+{n:'Train',p:[['rectangle','blue',28,90,92,50],['rectangle','red',92,62,32,30],['rectangle','gray',40,64,16,26],['circle','gray',36,46,16,16],['rectangle','green',126,100,50,40],['circle','black',38,134,28,28],['circle','black',80,134,28,28],['circle','black',138,134,28,28]]},
+{n:'Ice Cream',p:[['triangle','brown',70,100,60,80,180],['circle','pink',62,62,76,50],['circle','yellow',74,34,52,42],['circle','red',92,18,16,16]]},
+{n:'Dog',p:[['rectangle','brown',50,95,90,45],['rectangle','brown',125,55,45,45],['rectangle','orange',160,52,10,30],['rectangle','brown',55,138,14,35],['rectangle','brown',120,138,14,35],['circle','black',148,68,8,8],['circle','black',162,84,12,12],['rectangle','brown',30,90,24,8,-30]]},
+{n:'Penguin',p:[['circle','black',65,48,70,118],['circle','white',80,88,40,70],['circle','white',78,66,16,16],['circle','white',106,66,16,16],['triangle','orange',92,82,16,12,180],['triangle','black',44,95,25,50],['triangle','black',131,95,25,50],['rectangle','orange',72,164,22,8],['rectangle','orange',106,164,22,8]]},
+{n:'Flower',p:[['rectangle','green',97,102,6,78],['circle','green',72,128,26,14],['circle','green',104,142,26,14],['circle','pink',87,26,26,26],['circle','pink',87,76,26,26],['circle','pink',58,51,26,26],['circle','pink',116,51,26,26],['circle','yellow',88,52,24,24]]},
+{n:'Owl',p:[['circle','brown',60,50,80,115],['triangle','brown',62,36,24,26],['triangle','brown',114,36,24,26],['circle','white',72,70,27,27],['circle','white',101,70,27,27],['circle','black',82,80,8,8],['circle','black',110,80,8,8],['triangle','orange',93,98,14,14,180],['circle','yellow',78,118,44,40],['rectangle','orange',76,162,18,8],['rectangle','orange',106,162,18,8]]}
 ];
 const TG={square:[10,10,40,40],rectangle:[4,17,52,26],circle:[7,7,46,46],triangle:[7,9,46,42]};
 function draw(s,x,y,w,h,r,a){
@@ -119,7 +132,7 @@ function speak(t){
 }
 
 // game
-let gauge,order,fi,idx,locked,correct,justPlaced,running=false;
+let gauge,order,fi,idx,locked,correct,justPlaced,running=false,waiting=false;
 const fig=()=>FIGS[order[fi%order.length]];
 function shuffle(a){for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]]}return a}
 function setGauge(){
@@ -149,7 +162,7 @@ function newRound(){
     const [a,b]=k.split('|');
     return `<button class="opt" data-k="${k}" aria-label="${b} ${a}"><svg viewBox="0 0 60 60">${draw(a,...TG[a],0,`fill="${COL[b]}" stroke="rgba(0,0,0,.35)" stroke-width="2"`)}</svg>${S.labels?`<span>${b} ${a}</span>`:''}</button>`;
   }).join('');
-  $('ptxt').innerHTML=`Find the <span style="color:${COL[c]};text-shadow:0 0 1px #000">${c}</span> ${s}`;
+  $('ptxt').innerHTML=`Find the <span style="background:${COL[c]};color:${c==='yellow'||c==='white'?'#222':'#fff'};padding:0 8px;border-radius:8px">${c}</span> ${s}`;
   renderStage();
   speak(`Find the ${c} ${s}`);
 }
@@ -160,7 +173,7 @@ function pick(btn){
     tone(660,.12);tone(880,.18,'sine',.1);
     if(gauge>=100){renderStage();return finish(true)}
     if(idx>=fig().p.length){
-      renderStage();locked=true;
+      renderStage();locked=true;waiting=false;setTimeout(()=>waiting=true,500);
       $('ttxt').textContent='🎉 You built a '+fig().n+'!';$('toast').hidden=false;
       [523,659,784].forEach((f,i)=>tone(f,.2,'triangle',i*.12));
       speak('You built a '+fig().n.toLowerCase()+'!');
@@ -180,11 +193,16 @@ function finish(win){
   setTimeout(()=>$('end').hidden=false,win?700:400);
 }
 function startGame(){
-  gauge=1;order=shuffle(FIGS.map((_,i)=>i));fi=0;idx=0;locked=false;justPlaced=false;running=true;
+  gauge=1;order=shuffle(FIGS.map((_,i)=>i));fi=0;idx=0;locked=false;justPlaced=false;running=true;waiting=false;
   $('toast').hidden=true;$('end').hidden=true;$('start').hidden=true;setGauge();newRound();
 }
 $('tray').addEventListener('click',e=>{const b=e.target.closest('.opt');if(b)pick(b)});
-$('cont').onclick=()=>{if(!running)return;$('toast').hidden=true;fi++;idx=0;justPlaced=false;locked=false;newRound()};
+function advance(){
+  $('toast').hidden=true;fi++;
+  if(fi>=order.length){const last=order[order.length-1];order=shuffle(FIGS.map((_,i)=>i));if(order[0]===last)[order[0],order[1]]=[order[1],order[0]];fi=0}
+  idx=0;justPlaced=false;locked=false;newRound();
+}
+document.addEventListener('click',e=>{if(!waiting||!running||!$('set').hidden||e.target.closest('#gear'))return;waiting=false;advance()});
 $('play').onclick=startGame;$('again').onclick=startGame;
 $('restart').onclick=()=>{$('set').hidden=true;startGame()};
 $('say').onclick=()=>{if(running){const [s,c]=fig().p[idx];const v=S.voice;S.voice=true;speak(`Find the ${c} ${s}`);S.voice=v}};
