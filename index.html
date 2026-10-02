@@ -5,6 +5,12 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Mika's Adorable Playhouse</title>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%A6%84%3C/text%3E%3C/svg%3E">
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#FF6FA5">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Playhouse">
 <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;600;700&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
 <style>
 :root{--bg:#FFF6E9;--surface:#fff;--ink:#3B2A4A;--muted:#7A6A88;--accent:#FF6FA5;--accent2:#4FC3C7;--line:#F0DFC8;--shadow:rgba(59,42,74,.12);
@@ -44,6 +50,9 @@ main{display:grid;grid-template-columns:repeat(auto-fill,minmax(var(--min),1fr))
 .card h2{margin:0;font-size:1.35rem;font-weight:600;line-height:1.25;overflow-wrap:anywhere}
 .star{position:absolute;top:14px;right:14px;background:none;border:0;font-size:1.5rem;line-height:1;cursor:pointer;color:var(--line);padding:4px}
 .star[aria-pressed=true],.star:hover{color:#F5B400}
+[hidden]{display:none!important}
+.note{margin:0;font-size:.8rem;color:var(--muted);line-height:1.4}
+.menu .btn{text-align:center}
 .state{grid-column:1/-1;text-align:center;color:var(--muted);padding:48px 0}
 #viewer{grid-column:1/-1;display:flex;flex-direction:column;min-height:0;flex:1}
 #viewer[hidden]{display:none}
@@ -84,6 +93,9 @@ body[data-density=roomy]{--min:340px;--gap:28px}
       <label class="row">Auto-hide header while playing<input type="checkbox" id="autohide"></label>
       <label class="row">Sound<input type="checkbox" id="sound"></label>
       <div class="row">Games found<span id="count">0</span></div>
+      <div class="row" id="offRow" hidden>Offline copy<span id="offStatus">Checking…</span></div>
+      <button class="btn" id="installBtn" hidden>Install app</button>
+      <p class="note" id="iosNote" hidden>To install on iPhone or iPad: tap Share, then Add to Home Screen.</p>
     </div>
     <button class="btn" id="aboutBtn">About</button>
     <button class="btn icon" id="hideBtn" title="Hide header (H)" aria-label="Hide header">▲</button>
@@ -114,6 +126,7 @@ body[data-density=roomy]{--min:340px;--gap:28px}
 </header>
 <main id="grid">
   <p class="state">Loading games…</p>
+  <noscript><p class="state">This page needs JavaScript. Open it in a regular browser such as Chrome or Safari, not a file preview.</p></noscript>
   <section id="viewer" hidden>
     <div class="vbar">
       <button class="btn" id="vBack">← All games</button>
@@ -141,6 +154,8 @@ const THEMES={
 };
 const KEYWORDS=[[/abc|letter|alphabet|word|spell/i,'🔤'],[/num|count|math|1234/i,'🔢'],[/color|colour|paint|draw/i,'🎨'],[/shape/i,'🔷'],[/farm|cow|barn/i,'🐄'],[/animal|zoo|pet|dog|cat/i,'🐶'],[/music|piano|song|sound/i,'🎵'],[/match|memory|pair/i,'🧠'],[/puzzle/i,'🧩'],[/space|rocket|planet/i,'🚀'],[/car|truck|vehicle|train/i,'🚗'],[/ball|balloon|pop|bubble/i,'🎈'],[/fish|ocean|sea/i,'🐠'],[/dino/i,'🦖'],[/bug|insect|bee/i,'🐝'],[/food|fruit|veg/i,'🍎']];
 const EMOJI=['🦄','🧸','🌈','⭐','🐥','🎲','🪁','🍓','🐢','🎯','🛝','🪀'];
+const HOSTED='https://kungpowunicorn.github.io/map/';
+const OFF='mph-v1';
 const TAGLINE="Pick a game and let's play!";
 const $=id=>document.getElementById(id);
 const store={get(k,d){try{return localStorage.getItem(k)??d}catch{return d}},set(k,v){try{localStorage.setItem(k,v)}catch{}},del(k){try{localStorage.removeItem(k)}catch{}}};
@@ -246,6 +261,7 @@ async function listGitHub(){
   const res=await fetch(`https://api.github.com/repos/${REPO}/git/trees/main?recursive=1`);
   if(!res.ok)throw new Error('GitHub API returned '+res.status+(res.status===403?' (rate limit)':''));
   const data=await res.json();S.truncated=!!data.truncated;
+  S.allFiles=data.tree.filter(n=>n.type==='blob'&&!n.path.split('/').some(g=>g.startsWith('.')||g==='node_modules')&&!/^(README\.md|LICENSE|serve\.py|sw\.js)$/i.test(n.path)).map(n=>({path:n.path,sha:n.sha}));
   const all=data.tree.filter(n=>n.type==='blob'&&isHtml(n.path)).map(n=>n.path);
   S.skipped=all.filter(skipReason).map(p=>[p,skipReason(p)]);
   return all.filter(p=>!skipReason(p));
@@ -287,14 +303,17 @@ async function scanPicked(files){
   S.skipped=html.filter(x=>skipReason(x.path)).map(x=>[x.path,skipReason(x.path)]);
   return pool(html.filter(x=>!skipReason(x.path)),async x=>parseMeta(x.path,await x.f.text(),new URL(encPath(x.path),location.href)));
 }
-function showPicker(msg){
-  $('tagline').textContent='Pick your games folder';
+function showPicker(msg,noPick){
+  $('tagline').textContent=noPick?TAGLINE:'Pick your games folder';
   $('grid').querySelectorAll(':scope > :not(#viewer)').forEach(n=>n.remove());
   const box=document.createElement('div');box.className='state';
   const p=document.createElement('p');
   p.textContent=msg||"Browsers can't list a folder on their own. Choose the folder that holds this index.html once, and the Playhouse will remember what it finds.";
-  const b=document.createElement('button');b.className='btn';b.textContent='Choose games folder';b.onclick=()=>$('picker').click();
-  box.append(p,b);$('viewer').before(box);
+  box.append(p);
+  if(!noPick){const b=document.createElement('button');b.className='btn';b.textContent='Choose games folder';b.onclick=()=>$('picker').click();box.append(b)}
+  const a=document.createElement('a');a.href=HOSTED;a.textContent='Open the online version (it works offline after one visit)';
+  a.style.cssText='display:block;margin-top:16px;color:var(--accent2);font-weight:600';
+  box.append(a);$('viewer').before(box);
 }
 function initPicker(){
   $('picker').onchange=async e=>{
@@ -407,26 +426,67 @@ function step(d){
   go(S.list[(i+d+S.list.length)%S.list.length].path);blip(740);
 }
 
+/* ---------- offline copy (https only) ---------- */
+const canOffline=location.protocol==='https:'&&'serviceWorker' in navigator&&'caches' in window;
+const SAVED_KEY='mph_saved_v1';
+const getSaved=()=>{try{return JSON.parse(store.get(SAVED_KEY,'{}'))}catch{return {}}};
+const offStatus=t=>{$('offStatus').textContent=t};
+function showSavedStatus(){const n=Object.keys(getSaved()).length;offStatus(n?`Ready · ${n} files`:'Not saved yet')}
+async function syncOffline(){
+  if(!canOffline||!S.allFiles?.length||navigator.connection?.saveData)return;
+  try{
+    const cache=await caches.open(OFF),saved=getSaved();
+    const need=S.allFiles.filter(f=>saved[f.path]!==f.sha);
+    if(!need.length){showSavedStatus();return}
+    let done=0,failed=0;offStatus(`Saving 0/${need.length}`);
+    await pool(need,async f=>{
+      const u=new URL(encPath(f.path),location.href).href;
+      try{const r=await fetch(u,{cache:'reload'});if(!r.ok)throw 0;await cache.put(u,r);saved[f.path]=f.sha}catch{failed++}
+      offStatus(`Saving ${++done}/${need.length}`);
+    },6);
+    store.set(SAVED_KEY,JSON.stringify(saved));
+    failed?offStatus(`Saved · ${failed} missing, press ↻ to retry`):showSavedStatus();
+  }catch{offStatus('Could not save offline')}
+}
+function initPWA(){
+  $('offRow').hidden=!canOffline;
+  if(canOffline)navigator.serviceWorker.register('sw.js').catch(()=>{});
+  let deferred=null;
+  window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();deferred=e;$('installBtn').hidden=false});
+  window.addEventListener('appinstalled',()=>{$('installBtn').hidden=true});
+  $('installBtn').onclick=async()=>{if(!deferred)return;deferred.prompt();await deferred.userChoice.catch(()=>{});deferred=null;$('installBtn').hidden=true};
+  const ios=/iphone|ipad|ipod/i.test(navigator.userAgent)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1);
+  const standalone=matchMedia('(display-mode: standalone)').matches||navigator.standalone;
+  $('iosNote').hidden=!(canOffline&&ios&&!standalone);
+}
+
 /* ---------- lifecycle ---------- */
-function readCache(){
-  try{const c=JSON.parse(store.get(CACHE_KEY,'null'));if(c&&Date.now()-c.t<TTL){S.truncated=c.tr;return c.metas}}catch{}
+function readCache(any){
+  try{const c=JSON.parse(store.get(CACHE_KEY,'null'));if(c&&(any||Date.now()-c.t<TTL)){S.truncated=c.tr;return c.metas}}catch{}
   return null;
 }
 async function initDashboard(force=false){
   $('tagline').textContent='Looking for games…';
   try{
+    if(!/^(https?|file):$/.test(location.protocol)){showPicker("This copy was opened in a way that hides its game files, so the games can't be found.",true);return}
     if(isFile){
       const c=force?null:readFiles();
       if(c){S.metas=c;render();route();if(S.scanned)$('count').title='Last scanned '+new Date(S.scanned).toLocaleString();return}
       showPicker();return;
     }
-    S.skipped=[];let metas=!force&&!isLocal?readCache():null;const cached=!!metas;
+    S.skipped=[];let metas=!force&&!isLocal?readCache(!navigator.onLine):null;const cached=!!metas;
     if(!metas){
-      const files=await(isLocal?listLocal():listGitHub());
-      metas=await pool(files,getMeta);
-      if(!isLocal)store.set(CACHE_KEY,JSON.stringify({t:Date.now(),tr:S.truncated,metas}));
+      try{
+        const files=await(isLocal?listLocal():listGitHub());
+        metas=await pool(files,getMeta);
+        if(!isLocal)store.set(CACHE_KEY,JSON.stringify({t:Date.now(),tr:S.truncated,metas}));
+      }catch(err){
+        metas=isLocal?null:readCache(true);
+        if(!metas)throw err;
+      }
     }
     S.metas=metas;render();route();
+    if(canOffline){showSavedStatus();syncOffline()}
     console.groupCollapsed(`[Playhouse] ${metas.length} games found, ${S.skipped.length} excluded (${cached?'from cache':isLocal?'local directory listing':'GitHub API'})`);
     console.table(metas.map(m=>({path:m.path,title:m.title})));
     if(S.skipped.length)console.table(S.skipped.map(([path,why])=>({path,why})));
@@ -466,7 +526,7 @@ function initUI(){
     else if(S.cur&&e.key==='ArrowLeft')step(-1);
   });
 }
-document.addEventListener('DOMContentLoaded',()=>{initSettings();initUI();initPicker();initDashboard()});
+document.addEventListener('DOMContentLoaded',()=>{initSettings();initUI();initPicker();initPWA();initDashboard()});
 </script>
 </body>
 </html>
